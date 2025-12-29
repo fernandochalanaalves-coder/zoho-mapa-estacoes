@@ -1,106 +1,186 @@
+/*************************************************
+ * CONFIGURAÇÃO
+ *************************************************/
+
+const ACCESS_TOKEN = "COLOCA_AQUI_O_ACCESS_TOKEN"; // OAuth access token (1h)
+
+const APP_OWNER = "moia.caboverde887";
+const APP_NAME = "bionic-iii";
+
+const REPORT_ESTACOES = "Lista_de_estacao";
+const REPORT_MONIT = "Lista_monitorizacao_estacoes";
+
+/*************************************************
+ * MAPA
+ *************************************************/
+
 let map;
 let markers = [];
-let allRecords = [];
-
-function showError(msg) {
-  const box = document.getElementById("errorBox");
-  box.style.display = "block";
-  box.textContent = msg;
-}
+let allStations = [];
 
 function initMap() {
   map = new google.maps.Map(document.getElementById("map"), {
-    center: { lat: 14.916, lng: -23.509 },
+    center: { lat: 14.92, lng: -23.51 },
     zoom: 13,
-    mapTypeId: "roadmap",
   });
 
-  console.log("Google Maps inicializado");
+  loadData();
 }
 
-function reloadData() {
-  if (!window.ZOHO) {
-    showError("Zoho SDK ainda não disponível.");
-    return;
+/*************************************************
+ * API ZOHO CREATOR
+ *************************************************/
+
+async function fetchReport(reportName) {
+  const url = `https://www.zohoapis.com/creator/v2/${APP_OWNER}/${APP_NAME}/report/${reportName}`;
+
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Zoho-oauthtoken ${ACCESS_TOKEN}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Erro ao carregar ${reportName}`);
   }
 
-  loadStations();
+  const json = await res.json();
+  return json.data || [];
 }
 
-function loadStations() {
-  ZOHO.CREATOR.API.getAllRecords({
-    appName: "bionic-iii",
-    reportName: "Lista_de_estacao",
-    page: 1,
-    pageSize: 200,
-  })
-    .then((res) => {
-      allRecords = res.data || [];
-      drawUI();
-    })
-    .catch((err) => {
-      console.error(err);
-      showError("Erro ao carregar estações.");
-    });
+/*************************************************
+ * CARREGAR DADOS
+ *************************************************/
+
+async function loadData() {
+  try {
+    showError("");
+
+    const stations = await fetchReport(REPORT_ESTACOES);
+    const visits = await fetchReport(REPORT_MONIT);
+
+    allStations = normalizeData(stations, visits);
+
+    drawStations(allStations);
+    drawMarkers(allStations);
+    fillFilters(allStations);
+
+  } catch (err) {
+    showError(err.message);
+    console.error(err);
+  }
 }
 
-function clearMarkers() {
-  markers.forEach((m) => m.setMap(null));
+/*************************************************
+ * NORMALIZAÇÃO
+ *************************************************/
+
+function normalizeData(stations, visits) {
+  return stations.map(st => {
+    const stationVisits = visits.filter(v =>
+      v.Linha_estacoes?.some(l => l.ID === st.ID)
+    );
+
+    stationVisits.sort((a, b) =>
+      new Date(b.Inicio) - new Date(a.Inicio)
+    );
+
+    const lastVisit = stationVisits[0];
+
+    return {
+      id: st.ID,
+      numero: st.Numero_estacao,
+      tipo: st.Tipo_de_estacoes?.display_value || "-",
+      lat: parseFloat(st.Latitude),
+      lng: parseFloat(st.Longitude),
+      local: st.Local || "-",
+      estado: lastVisit?.Estado_da_estacao?.parent?.display_value || "Sem inspeção",
+      ultimaInspecao: lastVisit ? lastVisit.Inicio.split(" ")[0] : "-",
+    };
+  });
+}
+
+/*************************************************
+ * UI
+ *************************************************/
+
+function drawStations(list) {
+  const container = document.getElementById("stationList");
+  container.innerHTML = "";
+
+  list.forEach(st => {
+    const div = document.createElement("div");
+    div.className = "station";
+    div.innerHTML = `
+      <div class="station-title">${st.numero} — ${st.tipo}</div>
+      <div class="station-meta">${st.estado}</div>
+    `;
+
+    div.onclick = () => {
+      map.setCenter({ lat: st.lat, lng: st.lng });
+      map.setZoom(16);
+    };
+
+    container.appendChild(div);
+  });
+}
+
+function drawMarkers(list) {
+  markers.forEach(m => m.setMap(null));
   markers = [];
-}
 
-function drawUI() {
-  clearMarkers();
-
-  const panel = document.getElementById("panel");
-  panel.innerHTML = "";
-
-  allRecords.forEach((rec) => {
-    if (!rec.Latitude || !rec.Longitude) return;
-
-    const lat = parseFloat(rec.Latitude);
-    const lng = parseFloat(rec.Longitude);
+  list.forEach(st => {
+    if (isNaN(st.lat) || isNaN(st.lng)) return;
 
     const marker = new google.maps.Marker({
-      position: { lat, lng },
+      position: { lat: st.lat, lng: st.lng },
       map,
     });
 
     const info = new google.maps.InfoWindow({
       content: `
-        <strong>${rec.Numero_estacao}</strong><br/>
-        Tipo: ${rec.Tipo_de_estacoes?.display_value || "-"}<br/>
-        Local: ${rec.Local || "-"}
+        <strong>${st.tipo}</strong><br/>
+        Estado: ${st.estado}<br/>
+        Última inspeção: ${st.ultimaInspecao}<br/>
+        Local: ${st.local}
       `,
     });
 
-    marker.addListener("click", () => {
-      info.open(map, marker);
-    });
-
+    marker.addListener("click", () => info.open(map, marker));
     markers.push(marker);
-
-    const div = document.createElement("div");
-    div.className = "item";
-    div.innerHTML = `
-      <strong>${rec.Numero_estacao}</strong><br/>
-      ${rec.Tipo_de_estacoes?.display_value || ""}
-    `;
-    div.onclick = () => {
-      map.setCenter({ lat, lng });
-      map.setZoom(17);
-      info.open(map, marker);
-    };
-
-    panel.appendChild(div);
   });
 }
 
-/* ===== ZOHO EMBEDDED APP ===== */
+function fillFilters(list) {
+  const tipos = [...new Set(list.map(s => s.tipo))];
+  const estados = [...new Set(list.map(s => s.estado))];
 
-ZOHO.embeddedApp.on("PageLoad", function () {
-  console.log("Zoho Embedded App carregada");
-  reloadData();
-});
+  fillSelect("tipoFilter", tipos);
+  fillSelect("estadoFilter", estados);
+}
 
-ZOHO.embeddedApp.init();
+function fillSelect(id, values) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = `<option value="">Todos</option>`;
+  values.forEach(v => {
+    const o = document.createElement("option");
+    o.value = v;
+    o.textContent = v;
+    sel.appendChild(o);
+  });
+}
+
+/*************************************************
+ * ERROS
+ *************************************************/
+
+function showError(msg) {
+  const box = document.getElementById("errorBox");
+  if (!msg) {
+    box.style.display = "none";
+  } else {
+    box.textContent = msg;
+    box.style.display = "block";
+  }
+}
+
