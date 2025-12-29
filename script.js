@@ -2,117 +2,105 @@ let map;
 let markers = [];
 let allRecords = [];
 
-/* =========================
-   Google Maps
-========================= */
+function showError(msg) {
+  const box = document.getElementById("errorBox");
+  box.style.display = "block";
+  box.textContent = msg;
+}
+
 function initMap() {
   map = new google.maps.Map(document.getElementById("map"), {
     center: { lat: 14.916, lng: -23.509 },
     zoom: 13,
-    mapTypeControl: true,
+    mapTypeId: "roadmap",
   });
 
   console.log("Google Maps inicializado");
 }
 
-/* =========================
-   Zoho SDK
-========================= */
-function waitForZohoSDK(retries = 20) {
-  if (window.ZOHO && ZOHO.CREATOR) {
-    console.log("Zoho SDK disponível");
-    ZOHO.CREATOR.init().then(loadAllData);
+function reloadData() {
+  if (!window.ZOHO) {
+    showError("Zoho SDK ainda não disponível.");
     return;
   }
 
-  if (retries <= 0) {
-    showError("Zoho Creator SDK não carregou.");
-    return;
-  }
-
-  console.log("A aguardar Zoho SDK...");
-  setTimeout(() => waitForZohoSDK(retries - 1), 500);
+  loadStations();
 }
 
-waitForZohoSDK();
-
-/* =========================
-   Load Data
-========================= */
-function loadAllData() {
-  clearMarkers();
-  document.getElementById("panel").innerHTML = "";
-
+function loadStations() {
   ZOHO.CREATOR.API.getAllRecords({
     appName: "bionic-iii",
-    reportName: "Lista_estacao",
+    reportName: "Lista_de_estacao",
     page: 1,
     pageSize: 200,
   })
     .then((res) => {
       allRecords = res.data || [];
-      drawUI(allRecords);
+      drawUI();
     })
     .catch((err) => {
       console.error(err);
-      showError("Erro ao carregar dados do Zoho Creator.");
+      showError("Erro ao carregar estações.");
     });
 }
 
-/* =========================
-   UI
-========================= */
-function drawUI(records) {
-  records.forEach((rec) => {
-    const lat = parseFloat(rec.Latitude);
-    const lng = parseFloat(rec.Longitude);
-
-    if (!lat || !lng) return;
-
-    const marker = new google.maps.Marker({
-      map,
-      position: { lat, lng },
-    });
-
-    const info = `
-      <strong>${rec.Numero_estacao || ""}</strong><br/>
-      Tipo: ${rec.Tipo_de_estacoes?.display_value || "-"}<br/>
-      Local: ${rec.Local || "-"}
-    `;
-
-    const infowindow = new google.maps.InfoWindow({ content: info });
-    marker.addListener("click", () => infowindow.open(map, marker));
-
-    markers.push(marker);
-
-    const item = document.createElement("div");
-    item.className = "station-item";
-    item.innerHTML = `
-      <div class="station-title">${rec.Numero_estacao || ""}</div>
-      <div class="station-meta">
-        ${rec.Tipo_de_estacoes?.display_value || ""}
-      </div>
-    `;
-    item.onclick = () => {
-      map.panTo({ lat, lng });
-      map.setZoom(16);
-      infowindow.open(map, marker);
-    };
-
-    document.getElementById("panel").appendChild(item);
-  });
-}
-
-/* =========================
-   Helpers
-========================= */
 function clearMarkers() {
   markers.forEach((m) => m.setMap(null));
   markers = [];
 }
 
-function showError(msg) {
-  const box = document.getElementById("errorBox");
-  box.textContent = msg;
-  box.style.display = "block";
+function drawUI() {
+  clearMarkers();
+
+  const panel = document.getElementById("panel");
+  panel.innerHTML = "";
+
+  allRecords.forEach((rec) => {
+    if (!rec.Latitude || !rec.Longitude) return;
+
+    const lat = parseFloat(rec.Latitude);
+    const lng = parseFloat(rec.Longitude);
+
+    const marker = new google.maps.Marker({
+      position: { lat, lng },
+      map,
+    });
+
+    const info = new google.maps.InfoWindow({
+      content: `
+        <strong>${rec.Numero_estacao}</strong><br/>
+        Tipo: ${rec.Tipo_de_estacoes?.display_value || "-"}<br/>
+        Local: ${rec.Local || "-"}
+      `,
+    });
+
+    marker.addListener("click", () => {
+      info.open(map, marker);
+    });
+
+    markers.push(marker);
+
+    const div = document.createElement("div");
+    div.className = "item";
+    div.innerHTML = `
+      <strong>${rec.Numero_estacao}</strong><br/>
+      ${rec.Tipo_de_estacoes?.display_value || ""}
+    `;
+    div.onclick = () => {
+      map.setCenter({ lat, lng });
+      map.setZoom(17);
+      info.open(map, marker);
+    };
+
+    panel.appendChild(div);
+  });
 }
+
+/* ===== ZOHO EMBEDDED APP ===== */
+
+ZOHO.embeddedApp.on("PageLoad", function () {
+  console.log("Zoho Embedded App carregada");
+  reloadData();
+});
+
+ZOHO.embeddedApp.init();
