@@ -1,153 +1,34 @@
 <!DOCTYPE html>
 <html lang="pt">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Mapa de Estações</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+  <meta charset="UTF-8" />
+  <title>Mapa de Estações</title>
 
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #f5f5f7;
-      }
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+    }
+    #map {
+      width: 100%;
+      height: 100vh;
+    }
+  </style>
 
-      .app {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-      }
+  <!-- Google Maps -->
+  <script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAx6FJ2EUQOp-en4pH8nPrUx_5-DZwajMo&callback=initMap"
+    async
+    defer
+  ></script>
 
-      .topbar {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 10px 14px;
-        background: #ffffff;
-        border-bottom: 1px solid #e5e7eb;
-      }
+</head>
+<body>
 
-      .topbar h1 {
-        font-size: 15px;
-        margin: 0;
-        font-weight: 600;
-      }
+  <div id="map"></div>
 
-      .filters {
-        display: flex;
-        gap: 10px;
-        margin-left: 10px;
-      }
-
-      select {
-        padding: 4px 8px;
-        border-radius: 6px;
-        border: 1px solid #d1d5db;
-      }
-
-      .refresh {
-        margin-left: auto;
-        background: #2563eb;
-        color: #fff;
-        border: none;
-        border-radius: 999px;
-        padding: 6px 12px;
-        cursor: pointer;
-      }
-
-      .main {
-        flex: 1;
-        display: flex;
-        min-height: 0;
-      }
-
-      .sidebar {
-        width: 280px;
-        background: #ffffff;
-        border-right: 1px solid #e5e7eb;
-        overflow-y: auto;
-      }
-
-      .sidebar h2 {
-        font-size: 13px;
-        margin: 10px;
-        color: #374151;
-      }
-
-      .station {
-        padding: 10px;
-        border-bottom: 1px solid #f1f5f9;
-        cursor: pointer;
-      }
-
-      .station:hover {
-        background: #f3f4f6;
-      }
-
-      .station-title {
-        font-weight: 600;
-        font-size: 13px;
-      }
-
-      .station-meta {
-        font-size: 11px;
-        color: #6b7280;
-      }
-
-      #map {
-        flex: 1;
-      }
-
-      .error {
-        background: #fee2e2;
-        color: #991b1b;
-        padding: 8px 12px;
-        font-size: 12px;
-        display: none;
-      }
-    </style>
-  </head>
-
-  <body>
-    <div class="app">
-      <div class="topbar">
-        <h1>Mapa de Estações</h1>
-
-        <div class="filters">
-          <select id="tipoFilter">
-            <option value="">Todos os tipos</option>
-          </select>
-
-          <select id="estadoFilter">
-            <option value="">Todos os estados</option>
-          </select>
-        </div>
-
-        <button class="refresh" onclick="loadData()">Atualizar</button>
-      </div>
-
-      <div id="errorBox" class="error"></div>
-
-      <div class="main">
-        <div class="sidebar">
-          <h2>Estações</h2>
-          <div id="stationList"></div>
-        </div>
-
-        <div id="map"></div>
-      </div>
-    </div>
-
-    <!-- Google Maps -->
-    <script
-      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAx6FJ2EUQOp-en4pH8nPrUx_5-DZwajMo&callback=initMap"
-      async
-      defer
-    ></script>
-
-    <script src="script.js"></script>
-  </body>
+  <script src="script.js"></script>
+</body>
 </html>
-
